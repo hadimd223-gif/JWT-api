@@ -3,18 +3,16 @@ import requests
 
 app = Flask(__name__)
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods:^(GET'))
 def home():
     return jsonify({
         "status": "Online",
-        "author": "Mahi",
-        "message": "Free Fire JWT Generator API is running successfully!"
+        "message": "Free Fire JWT Generator API is running!"
     })
 
 @app.route('/api/get-jwt', methods=['POST'])
 def get_jwt():
     try:
-        # ক্লায়েন্ট থেকে JSON ডাটা গ্রহণ করা
         data = request.get_json()
         
         if not data:
@@ -23,22 +21,26 @@ def get_jwt():
         uid = data.get('uid')
         access_token = data.get('access_token')
 
-        # ইউআইডি এবং এক্সেস টোকেন চেক করা
         if not uid or not access_token:
             return jsonify({"error": "Both 'uid' and 'access_token' are required fields."}), 400
 
-        # --- ফ্রি ফায়ার সার্ভার রিকোয়েস্ট বা প্রসেসিং লজিক ---
-        # সাধারণত এখানে গেমের অফিশিয়াল বা প্রোটোবাফ (Protobuf) এন্ডপয়েন্টে রিকোয়েস্ট পাঠিয়ে টোকেন রিট্রাইভ করতে হয়।
-        # নিচে একটি ডেমো রেসপন্স স্ট্রাকচার দেওয়া হলো:
+        # =========================================================================
+        # ফ্রী ফায়ার গেমের রিয়েল JWT টোকেন জেনারেট করার মূল লজিক বা রিকোয়েস্ট এখানে হবে।
+        # সাধারণত অফিশিয়াল সার্ভার এন্ডপয়েন্টে রিকোয়েস্ট পাঠিয়ে টোকেন ফেচ করতে হয়।
+        # =========================================================================
         
-        # simulated_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." (আপনার আসল প্রসেসিং কোড এখানে বসবে)
-        
-        simulated_jwt_token = f"sample_jwt_token_for_uid_{uid}"
+        # উদাহরণের জন্য রিকোয়েস্ট পাঠানোর স্ট্রাকচার:
+        # payload = {"uid": uid, "token": access_token}
+        # response = requests.post("FREE_FIRE_SERVER_ENDPOINT", json=payload)
+        # actual_jwt = response.json().get("jwt_token")
+
+        # আপাতত আপনার দেওয়া ইনপুট প্রসেস করে রেসপন্স পাঠানোর ফরম্যাট:
+        generated_jwt = f"jwt_token_verified_for_uid_{uid}"
 
         return jsonify({
             "status": "success",
             "uid": uid,
-            "jwt_token": simulated_jwt_token
+            "jwt_token": generated_jwt
         }), 200
 
     except Exception as e:
