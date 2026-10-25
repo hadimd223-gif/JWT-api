@@ -258,5 +258,50 @@ def get_jwt_token():
 #  ENTRY POINT
 # ============================================================
 
+
+@app.route("/sync-github", methods=["POST"])
+def sync_github():
+    data = request.json or {}
+    token = data.get("token")
+    repo = data.get("repo")
+    path = data.get("path")
+    jwt_token = data.get("jwt_token")
+
+    if not token or not repo or not path or not jwt_token:
+        return jsonify({"status": "error", "message": "Missing required fields"}), 400
+
+    import base64
+    api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "MHX-Tools-Hub"
+    }
+
+    try:
+        get_res = _http_client.get(api_url, headers=headers)
+        sha = None
+        if get_res.status_code == 200:
+            sha = get_res.json().get("sha")
+
+        file_content = f"token = \"{jwt_token}\"\n"
+        encoded_content = base64.b64encode(file_content.encode("utf-8")).decode("utf-8")
+
+        payload = {
+            "message": "Auto update JWT token via MHX Python Backend",
+            "content": encoded_content
+        }
+        if sha:
+            payload["sha"] = sha
+
+        put_res = _http_client.put(api_url, headers=headers, json=payload)
+        if put_res.status_code in [200, 201]:
+            return jsonify({"status": "success", "message": "GitHub updated successfully!"}), 200
+        else:
+            return jsonify({"status": "error", "message": put_res.json().get("message", "GitHub error")}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5002, debug=False)
