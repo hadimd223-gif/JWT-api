@@ -3,6 +3,7 @@ import sys
 import time
 import json
 import base64
+import requests
 
 import httpx
 from flask import Flask, request, jsonify
@@ -47,7 +48,7 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'BlacklistInfoRes\x12#\n\nqueue_info\x18\r \x01(\x0b\x32\x0f.LoginQueue'
     b'Info\x12\x0e\n\x06tp_url\x18\x0e \x01(\t\x12\x15\n\rapp_server_id\x18'
     b'\x0f \x01(\r\x12\x0f\n\x07\x61no_url\x18\x10 \x01(\t\x12\x0f\n\x07ip_city'
-    b'\x18\x11 \x01(\t\x12\x16\n\x0eip_subdivision\x18\x12 \x01(\t*\xa8\x01\n'
+    b'\x11 \x01(\t\x12\x16\n\x0eip_subdivision\x18\x12 \x01(\t*\xa8\x01\n'
     b'\tBanReason\x12\x16\n\x12\x42\x41N_REASON_UNKNOWN\x10\x00\x12\x1b\n\x17'
     b'\x42\x41N_REASON_IN_GAME_AUTO\x10\x01\x12\x15\n\x11\x42\x41N_REASON_'
     b'REFUND\x10\x02\x12\x15\n\x11\x42\x41N_REASON_OTHERS\x10\x03\x12\x16\n'
@@ -88,6 +89,14 @@ LOGIN_URL = "https://loginbp.ppmainecoonghj.com/"
 HTTP_LIMITS = httpx.Limits(max_keepalive_connections=20, max_connections=50)
 HTTP_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 _http_client = httpx.Client(limits=HTTP_LIMITS, timeout=HTTP_TIMEOUT)
+
+# ============================================================
+#  GITHUB CONFIGURATION (আপনার গিটহাব তথ্য এখানে বসান)
+# ============================================================
+GITHUB_TOKEN = "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"  # গিটহাবের প্যাট (PAT) টোকেন দিন
+GITHUB_USERNAME = "YOUR_GITHUB_USERNAME"            # গিটহাব ইউজারনেম
+REPO_NAME = "YOUR_REPO_NAME"                      # রিপোজিটোরির নাম
+FILE_PATH = "path/to/token_file.txt"              # গিটহাবের যে ফাইলের মধ্যে টোকেন থাকবে তার পাথ
 
 
 # ============================================================
@@ -218,8 +227,40 @@ def generate_jwt_token(uid: str, password: str):
     }
 
 
+# GitHub ফাইলে নতুন টোকেন পুশ করার ফাংশন
+def update_github_file(new_token: str):
+    api_url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{REPO_NAME}/contents/{FILE_PATH}"
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "vnd.github+json"
+    }
+    
+    # ১. প্রথমে ফাইলের বর্তমান SHA কোড বের করতে হবে (GitHub API এর নিয়ম অনুযায়ী ফাইল আপডেট করতে SHA লাগে)
+    get_resp = requests.get(api_url, headers=headers)
+    if get_resp.status_code != 200:
+        raise Exception(f"Failed to fetch file from GitHub: {get_resp.text}")
+    
+    file_sha = get_resp.json().get("sha")
+    
+    # ২. নতুন টোকেনটিকে Base64 এ এনকোড করা
+    encoded_content = base64.b64encode(new_token.encode("utf-8")).decode("utf-8")
+    
+    # ৩. গিটহাব এপিআই-এ PUT রিকোয়েস্ট পাঠিয়ে ফাইল আপডেট করা
+    payload = {
+        "message": "Auto-update JWT Token via Termux API",
+        "content": encoded_content,
+        "sha": file_sha
+    }
+    
+    put_resp = requests.put(api_url, headers=headers, json=payload)
+    if put_resp.status_code not in [200, 201]:
+        raise Exception(f"Failed to update GitHub file: {put_resp.text}")
+    
+    return True
+
+
 # ============================================================
-#  PART 5 — Routes (JWT + GitHub Sync)
+#  PART 5 — Routes (JWT + Auto GitHub Sync)
 # ============================================================
 
 @app.route("/", methods=["GET"])
@@ -227,8 +268,7 @@ def index():
     return jsonify({
         "status": "ok",
         "endpoint": "/token?uid=UID&password=PASS",
-        "example": "/token?uid=18097039025&password=yourpass",
-        "sync_endpoint": "/sync-github"
+        "sync_endpoint": "/sync-github?token=YOUR_TOKEN"
     }), 200
 
 
@@ -248,6 +288,16 @@ def get_jwt_token():
 
     try:
         token_data = generate_jwt_token(uid, password)
+        jwt_token = token_data.get("token")
+        
+        # টোকেন জেনারেট হওয়ার সাথে সাথে গিটহাব ফাইলেও অটো-আপডেট পাঠিয়ে দেওয়া হলো
+        if jwt_token:
+            try:
+                update_github_file(jwt_token)
+                token_data["github_sync"] = "success"
+            except Exception as ge:
+                token_data["github_sync"] = f"failed: {str(ge)}"
+                
         return jsonify(token_data), 200
     except Exception as e:
         return jsonify({
@@ -262,14 +312,15 @@ def sync_github():
         return jsonify({"status": "ok"}), 200
     
     try:
-        data = request.json or request.args.to_dict()
-        print(f"📥 Received Sync Request: {data}")
-        
-        # গিটহাব অটো-আপডেটের লজিক এখানে যুক্ত করা যাবে
+        token_to_sync = request.args.get("token") or (request.json.get("token") if request.json else None)
+        if not token_to_sync:
+            return jsonify({"status": "error", "message": "Token parameter is missing"}), 400
+            
+        update_github_file(token_to_sync)
         
         return jsonify({
             "status": "success", 
-            "message": "Token synced with github successfully!"
+            "message": "JWT Token updated in GitHub repository successfully!"
         }), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
