@@ -1,7 +1,5 @@
-#IMPORTANT 
-#NOTICES 
-#IMPORT THE MODULES FORM REQUIREMENT.TXT
-
+import os
+import sys
 import time
 import json
 import base64
@@ -87,7 +85,6 @@ RELEASEVERSION = "OB55"
 USERAGENT = "UnityPlayer/2018.4.12f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)"
 LOGIN_URL = "https://loginbp.ppmainecoonghj.com/"
 
-# Fast HTTP client (connection pooling + keep-alive)
 HTTP_LIMITS = httpx.Limits(max_keepalive_connections=20, max_connections=50)
 HTTP_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 _http_client = httpx.Client(limits=HTTP_LIMITS, timeout=HTTP_TIMEOUT)
@@ -131,12 +128,10 @@ def try_parse_login_res(data: bytes):
 
 
 def extract_login_res(raw: bytes) -> dict:
-    # Attempt 1: from index 0
     parsed = try_parse_login_res(raw)
     if parsed:
         return parsed
 
-    # Attempt 2: scan each \x08
     idx = 0
     while True:
         idx = raw.find(b"\x08", idx)
@@ -147,7 +142,6 @@ def extract_login_res(raw: bytes) -> dict:
             return parsed
         idx += 1
 
-    # Attempt 3: JWT marker prefix
     jwt_marker = raw.find(b"eyJhbGciOiJIUzI1NiIs")
     if jwt_marker != -1:
         for i in range(jwt_marker - 1, max(jwt_marker - 300, -1), -1):
@@ -225,7 +219,7 @@ def generate_jwt_token(uid: str, password: str):
 
 
 # ============================================================
-#  PART 5 — Routes
+#  PART 5 — Routes (JWT + GitHub Sync)
 # ============================================================
 
 @app.route("/", methods=["GET"])
@@ -234,11 +228,15 @@ def index():
         "status": "ok",
         "endpoint": "/token?uid=UID&password=PASS",
         "example": "/token?uid=18097039025&password=yourpass",
+        "sync_endpoint": "/sync-github"
     }), 200
 
 
-@app.route("/token", methods=["GET"])
+@app.route("/token", methods=["GET", "POST", "OPTIONS"])
 def get_jwt_token():
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+        
     uid = request.args.get("uid")
     password = request.args.get("password")
 
@@ -258,33 +256,28 @@ def get_jwt_token():
         }), 500
 
 
+@app.route('/sync-github', methods=['GET', 'POST', 'OPTIONS'])
+def sync_github():
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+    
+    try:
+        data = request.json or request.args.to_dict()
+        print(f"📥 Received Sync Request: {data}")
+        
+        # গিটহাব অটো-আপডেটের লজিক এখানে যুক্ত করা যাবে
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Token synced with github successfully!"
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # ============================================================
 #  ENTRY POINT
 # ============================================================
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5002, debug=False)
-    
-#RUNNING NOW
-# =============================================
-# Auto-added /sync-github Route
-# =============================================
-@app.route('/sync-github', methods=['GET', 'POST', 'OPTIONS'])
-def sync_github():
-    if request.method == 'OPTIONS':
-        return jsonify({"status": "ok"}), 200
-
-    try:
-        # আপনার গিটহাব সিংক বা টোকেন আপডেট লজিক এখানে থাকবে
-        return jsonify({"status": "success", "message": "Token synced with github successfully!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/sync-github', methods=['GET', 'POST', 'OPTIONS'])
-def sync_github():
-    if request.method == 'OPTIONS':
-        return jsonify({"status": "ok"}), 200
-    try:
-        return jsonify({"status": "success", "message": "Synced successfully!"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
