@@ -77,7 +77,7 @@ LoginRes = _globals["LoginRes"]
 
 
 # ============================================================
-#  PART 2 — Settings & GitHub Config
+#  PART 2 — Settings & Config
 # ============================================================
 
 MAIN_KEY = base64.b64decode("WWcmdGMlREV1aDYlWmNeOA==")
@@ -86,7 +86,6 @@ RELEASEVERSION = "OB55"
 USERAGENT = "UnityPlayer/2018.4.12f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)"
 LOGIN_URL = "https://loginbp.ppmainecoonghj.com/"
 
-# গিটহাব কনফিগারেশন (আপনার গিটহাব তথ্য এখানে বসাবেন)
 GITHUB_TOKEN = "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
 GITHUB_USERNAME = "YOUR_GITHUB_USERNAME"
 REPO_NAME = "YOUR_REPO_NAME"
@@ -225,7 +224,6 @@ def generate_jwt_token(uid: str, password: str):
     }
 
 
-# গিটহাব ফাইলে নতুন টোকেন পুশ করার সেফ ফাংশন
 def update_github_file(new_token: str):
     if GITHUB_TOKEN == "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN":
         return  
@@ -238,13 +236,13 @@ def update_github_file(new_token: str):
     
     get_resp = requests.get(api_url, headers=headers)
     if get_resp.status_code != 200:
-        return # গিটহাব আপডেট ফেইল করলেও যেন মেইন জেনারেশন ক্র্যাশ না করে
+        return
     
     file_sha = get_resp.json().get("sha")
     encoded_content = base64.b64encode(new_token.encode("utf-8")).decode("utf-8")
     
     payload = {
-        "message": "Auto-update JWT Token via Termux API",
+        "message": "Auto-update JWT Token via Vercel API",
         "content": encoded_content,
         "sha": file_sha
     }
@@ -283,7 +281,6 @@ def get_jwt_token():
         token_data = generate_jwt_token(uid, password)
         jwt_token = token_data.get("token")
         
-        # ব্যাকগ্রাউন্ডে সেফলি গিটহাব আপডেট কল করা হলো
         if jwt_token:
             try:
                 update_github_file(jwt_token)
@@ -320,9 +317,7 @@ def sync_github():
 
 
 # ============================================================
-# ===========================================
-#  ENTRY POINT
+#  ENTRY POINT (Vercel Serverless Compatible)
 # ============================================================
-
-# ভার্সেল সার্ভারলেস এনভায়রনমেন্টের জন্য এটি ফিক্স করা হলো
-app = app
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5002, debug=False)
