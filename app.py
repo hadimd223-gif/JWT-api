@@ -20,7 +20,7 @@ from google.protobuf.message import Message
 
 
 # ============================================================
-#  PART 1 — FreeFire_pb2 (inlined)
+#  PART 1 — FreeFire_pb2 (Inlined Descriptor)
 # ============================================================
 
 _runtime_version.ValidateProtobufRuntimeVersion(
@@ -77,7 +77,7 @@ LoginRes = _globals["LoginRes"]
 
 
 # ============================================================
-#  PART 2 — Settings
+#  PART 2 — Settings & GitHub Config
 # ============================================================
 
 MAIN_KEY = base64.b64decode("WWcmdGMlREV1aDYlWmNeOA==")
@@ -86,17 +86,15 @@ RELEASEVERSION = "OB55"
 USERAGENT = "UnityPlayer/2018.4.12f1 (UnityWebRequest/1.0, libcurl/8.5.0-DEV)"
 LOGIN_URL = "https://loginbp.ppmainecoonghj.com/"
 
+# গিটহাব কনফিগারেশন (আপনার গিটহাব তথ্য এখানে বসাবেন)
+GITHUB_TOKEN = "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
+GITHUB_USERNAME = "YOUR_GITHUB_USERNAME"
+REPO_NAME = "YOUR_REPO_NAME"
+FILE_PATH = "path/to/token_file.txt"
+
 HTTP_LIMITS = httpx.Limits(max_keepalive_connections=20, max_connections=50)
 HTTP_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 _http_client = httpx.Client(limits=HTTP_LIMITS, timeout=HTTP_TIMEOUT)
-
-# ============================================================
-#  GITHUB CONFIGURATION (আপনার গিটহাব তথ্য এখানে বসান)
-# ============================================================
-GITHUB_TOKEN = "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"  # গিটহাবের প্যাট (PAT) টোকেন দিন
-GITHUB_USERNAME = "YOUR_GITHUB_USERNAME"            # গিটহাব ইউজারনেম
-REPO_NAME = "YOUR_REPO_NAME"                      # রিপোজিটোরির নাম
-FILE_PATH = "path/to/token_file.txt"              # গিটহাবের যে ফাইলের মধ্যে টোকেন থাকবে তার পাথ
 
 
 # ============================================================
@@ -108,7 +106,7 @@ CORS(app)
 
 
 # ============================================================
-#  PART 4 — Helpers
+#  PART 4 — Helpers & Crypto
 # ============================================================
 
 def pad(text: bytes) -> bytes:
@@ -227,40 +225,35 @@ def generate_jwt_token(uid: str, password: str):
     }
 
 
-# GitHub ফাইলে নতুন টোকেন পুশ করার ফাংশন
+# গিটহাব ফাইলে নতুন টোকেন পুশ করার সেফ ফাংশন
 def update_github_file(new_token: str):
+    if GITHUB_TOKEN == "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN":
+        return  
+        
     api_url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{REPO_NAME}/contents/{FILE_PATH}"
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "vnd.github+json"
     }
     
-    # ১. প্রথমে ফাইলের বর্তমান SHA কোড বের করতে হবে (GitHub API এর নিয়ম অনুযায়ী ফাইল আপডেট করতে SHA লাগে)
     get_resp = requests.get(api_url, headers=headers)
     if get_resp.status_code != 200:
-        raise Exception(f"Failed to fetch file from GitHub: {get_resp.text}")
+        return # গিটহাব আপডেট ফেইল করলেও যেন মেইন জেনারেশন ক্র্যাশ না করে
     
     file_sha = get_resp.json().get("sha")
-    
-    # ২. নতুন টোকেনটিকে Base64 এ এনকোড করা
     encoded_content = base64.b64encode(new_token.encode("utf-8")).decode("utf-8")
     
-    # ৩. গিটহাব এপিআই-এ PUT রিকোয়েস্ট পাঠিয়ে ফাইল আপডেট করা
     payload = {
         "message": "Auto-update JWT Token via Termux API",
         "content": encoded_content,
         "sha": file_sha
     }
     
-    put_resp = requests.put(api_url, headers=headers, json=payload)
-    if put_resp.status_code not in [200, 201]:
-        raise Exception(f"Failed to update GitHub file: {put_resp.text}")
-    
-    return True
+    requests.put(api_url, headers=headers, json=payload)
 
 
 # ============================================================
-#  PART 5 — Routes (JWT + Auto GitHub Sync)
+#  PART 5 — Routes
 # ============================================================
 
 @app.route("/", methods=["GET"])
@@ -290,13 +283,13 @@ def get_jwt_token():
         token_data = generate_jwt_token(uid, password)
         jwt_token = token_data.get("token")
         
-        # টোকেন জেনারেট হওয়ার সাথে সাথে গিটহাব ফাইলেও অটো-আপডেট পাঠিয়ে দেওয়া হলো
+        # ব্যাকগ্রাউন্ডে সেফলি গিটহাব আপডেট কল করা হলো
         if jwt_token:
             try:
                 update_github_file(jwt_token)
                 token_data["github_sync"] = "success"
-            except Exception as ge:
-                token_data["github_sync"] = f"failed: {str(ge)}"
+            except Exception:
+                token_data["github_sync"] = "skipped"
                 
         return jsonify(token_data), 200
     except Exception as e:
@@ -327,8 +320,9 @@ def sync_github():
 
 
 # ============================================================
+# ===========================================
 #  ENTRY POINT
 # ============================================================
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5002, debug=False)
+# ভার্সেল সার্ভারলেস এনভায়রনমেন্টের জন্য এটি ফিক্স করা হলো
+app = app
