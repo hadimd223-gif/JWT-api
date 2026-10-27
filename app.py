@@ -12,21 +12,22 @@ from Crypto.Cipher import AES
 from google.protobuf import json_format
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 from google.protobuf.message import Message
 
-# ============================================================
-#  PART 1 — FreeFire Protobuf Definition
-# ============================================================
-
+# Safe Protobuf Runtime Version check for v3.x (Render Compatible)
 try:
+    from google.protobuf import runtime_version as _runtime_version
     _runtime_version.ValidateProtobufRuntimeVersion(
-        _runtime_version.Domain.PUBLIC, 6, 30, 0, "", "FreeFire.proto",
+        _runtime_version.Domain.PUBLIC, 3, 20, 3, "", "FreeFire.proto",
     )
 except Exception:
     pass
+
+# ============================================================
+#  PART 1 — FreeFire Protobuf Definition
+# ============================================================
 
 _sym_db = _symbol_database.Default()
 
